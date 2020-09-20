@@ -1,0 +1,81 @@
+'================ Find and mark up formulae in sheet or workbook =====================
+'Used to check that formulae have been copied correctly and to pick up any hardcoded cells
+'It can speeds up checking by showing which cells have original formulae. 
+'Once these are checked, then you have only to check they have been copied correctly
+'A copy is made of the current sheet, and shading added to each cell with a formula
+'The shading shows if formulae are copied from the left (horizontal shading) or above (vertical shading), both (crosshatch shading), or neither (solid shading)
+'It takes some time because for each cell with a formula, it literally copies the formulae from left and above into that cell, and checks if they are identical
+
+Sub GetFormulae()
+    ActiveSheet.Copy
+    MarkFormulae
+End Sub
+
+Sub MarkFormulae(Optional S As Worksheet)
+  Dim V As Variant, rng As Range
+  Dim i As Long, j As Long, r As Long, C As Long, ii As Long, jj As Long, n As Long, Skip As Boolean
+  Dim vbLeft As Long, vbAbove As Long
+  vbLeft = 1: vbAbove = 2
+  Dim colorLeft As Long, colorAbove As Long, colorBoth As Long, colorNone As Long
+  colorLeft = 16773571
+  colorAbove = 10092543
+  colorBoth = 6750054
+  colorNone = 9486586
+  
+  Application.ScreenUpdating = False
+  Application.Calculation = xlCalculationManual
+  Application.EnableEvents = False
+  
+  If S Is Nothing Then Set S = ActiveSheet Else S.Activate
+  Cells.Interior.Color = xlNone
+  V = Range(Cells(1, 1), S.Cells.SpecialCells(xlCellTypeLastCell).Offset(1, 1)).Formula
+  r = UBound(V, 1)
+  C = UBound(V, 2)
+  ReDim A(r, C) As Long
+  
+  For i = 1 To r - 1
+    Application.StatusBar = "Processing " & S.Name & ": row " & i & " of " & r
+    For j = 1 To C - 1
+      If Left$(V(i, j), 1) = "=" Then
+        Cells(i, j).Copy
+        Cells(i, j + 1).PasteSpecial Paste:=xlPasteFormulas
+        If Cells(i, j + 1).Formula = V(i, j + 1) Then
+          A(i, j + 1) = A(i, j + 1) Or vbLeft
+        End If
+        Cells(i, j + 1).Formula = V(i, j + 1)
+        Cells(i, j).Copy
+        On Error Resume Next
+          Cells(i + 1, j).PasteSpecial Paste:=xlPasteFormulas
+          Skip = (err.Number <> 0)
+        On Error GoTo 0
+        If Skip = False Then
+          If Cells(i + 1, j).Formula = V(i + 1, j) Then
+            A(i + 1, j) = A(i + 1, j) Or vbAbove
+          End If
+          Cells(i + 1, j).Formula = V(i + 1, j)
+          Select Case A(i, j)
+          Case vbLeft
+            Cells(i, j).Interior.pattern = xlLightHorizontal
+            Cells(i, j).Interior.PatternColor = 6737151
+          Case vbAbove
+            Cells(i, j).Interior.pattern = xlLightVertical
+            Cells(i, j).Interior.PatternColor = 6737151
+          Case vbLeft + vbAbove
+            Cells(i, j).Interior.pattern = xlGrid
+            Cells(i, j).Interior.PatternColor = 6737151
+          Case Else
+            Cells(i, j).Interior.Color = colorNone
+          End Select
+        End If
+      End If
+    Next j
+    DoEvents
+  Next i
+  
+  Application.CutCopyMode = False
+  Cells(1, 1).Select
+  Application.Calculation = xlCalculationAutomatic
+  Application.EnableEvents = True
+  Application.StatusBar = False
+
+End Sub
